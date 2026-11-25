@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#101827"><title>VidiPay</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#141f32;--muted:#91a0b8;--accent:#43d6a3;--line:#26344b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f5f7fb;font:15px system-ui,-apple-system,sans-serif}
+main{max-width:520px;margin:auto;padding:18px 16px 90px}.top{display:flex;justify-content:space-between;align-items:center;margin:8px 0 20px}
+.brand{font-size:23px;font-weight:800;letter-spacing:.2px}.brand span{color:var(--accent)}
+.pill{font-size:12px;color:var(--accent);background:#12352f;padding:7px 10px;border-radius:20px}
+.balance{background:linear-gradient(135deg,#183c3b,#17263c);border:1px solid #28524c;border-radius:22px;padding:20px;margin-bottom:14px}
+.muted{color:var(--muted);font-size:13px}.amount{font-size:36px;font-weight:800;margin:6px 0 14px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stat,.panel{background:var(--panel);border:1px solid var(--line);border-radius:17px;padding:15px}
+.stat b{display:block;font-size:18px;margin-top:5px}.section{font-size:17px;font-weight:750;margin:22px 0 11px}
+button{border:0;border-radius:13px;padding:13px 15px;background:var(--accent);color:#06251c;font-weight:750;font-size:14px;width:100%}
+button.secondary{background:#24334b;color:#f5f7fb}button:disabled{opacity:.45}
+.video{width:100%;border-radius:13px;background:#05090f;margin:12px 0}
+input{width:100%;padding:13px;border-radius:12px;border:1px solid var(--line);background:#0c1626;color:white;margin:7px 0 12px;font-size:15px}
+.nav{position:fixed;bottom:0;left:0;right:0;background:#101a2b;border-top:1px solid var(--line);display:flex;justify-content:center;gap:8px;padding:10px max(12px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom))}
+.nav button{max-width:160px;background:transparent;color:var(--muted);padding:10px 8px}.nav button.active{color:var(--accent);background:#18332f}
+.hidden{display:none}.notice{font-size:13px;color:var(--muted);line-height:1.5}.row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+</style></head>
+<body><main>
+<header class="top"><div class="brand">Vidi<span>Pay</span></div><div class="pill">● Hisob faol</div></header>
+<section id="home">
+ <div class="balance"><div class="muted">Umumiy mablag‘</div><div class="amount" id="total">$0.00</div><div class="stats">
+  <div><div class="muted">Asosiy balans</div><b id="balance">$0.00</b></div><div><div class="muted">Bonus</div><b id="bonus">$0.00</b></div>
+ </div></div>
+ <div class="stats"><div class="stat"><div class="muted">Jami ko‘rilgan</div><b id="watched">0 daqiqa</b></div><div class="stat"><div class="muted">Bugungi limit</div><b id="remaining">120 daqiqa</b></div></div>
+ <div class="section">Video ko‘rib daromad oling</div>
+ <div class="panel"><div class="muted" id="rate">Soatiga $0.10 gacha</div><div id="videoArea" class="notice" style="margin:12px 0">Video ro‘yxati yuklanmoqda…</div><button id="start" onclick="startVideo()">▶ Videoni boshlash</button><div class="notice" id="watchNote" style="margin-top:10px">Video ochiq turganida hisob server orqali yuritiladi.</div></div>
+</section>
+<section id="friends" class="hidden"><div class="section">Do‘stlarni taklif qiling</div><div class="panel"><div class="stats"><div><div class="muted">Takliflar</div><b id="refs">0</b></div><div><div class="muted">Faol takliflar</div><b id="refsActive">0</b></div></div><p class="notice">Do‘stingiz kamida 10 daqiqa video ko‘rgach, referal bonusi hisoblanadi.</p><input id="refLink" readonly><button class="secondary" onclick="copyRef()">Havolani nusxalash</button></div></section>
+<section id="wallet" class="hidden"><div class="section">Pul yechish</div><div class="panel"><div class="muted">Minimal yechish: <b id="minimum">$5.00</b></div><label class="muted">Summa (USD)</label><input id="withdrawAmount" type="number" min="5" step=".01" placeholder="5.00"><label class="muted">Karta yoki hamyon raqami</label><input id="walletAddress" placeholder="Hamyon / karta raqami"><button onclick="withdraw()">So‘rov yuborish</button><p class="notice" id="withdrawMsg"></p></div><div class="section">Oxirgi so‘rovlar</div><div class="panel" id="history">Hozircha so‘rov yo‘q</div></section>
+</main><nav class="nav"><button class="active" onclick="tab('home',this)">⌂ Bosh sahifa</button><button onclick="tab('friends',this)">♧ Do‘stlar</button><button onclick="tab('wallet',this)">◈ Hamyon</button></nav>
+<script>
+const tg=window.Telegram?.WebApp; tg?.ready(); tg?.expand();
+let initData=tg?.initData||"", state=null, videoTimer=null, activeVideo=null;
+const $=id=>document.getElementById(id);
+function money(n){return '$'+Number(n||0).toFixed(2)}
+function tab(id,btn){['home','friends','wallet'].forEach(x=>$(x).classList.toggle('hidden',x!==id));document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));btn.classList.add('active');}
+async function api(path,body={}){if(!initData){throw new Error("Mini App Telegram ichidan ochilishi kerak.");}const r=await fetch('/api/'+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData,...body})});let d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Server xatosi');return d}
+function render(s){state=s;$('balance').textContent=money(s.balance);$('bonus').textContent=money(s.bonus);$('total').textContent=money(s.balance+s.bonus);$('watched').textContent=Math.floor(s.watch_sec/60)+' daqiqa';$('remaining').textContent=Math.max(0,Math.floor((s.cap_sec-s.today_sec)/60))+' daqiqa';$('rate').textContent='Soatiga '+money(s.rate_hour);$('refs').textContent=s.refs;$('refsActive').textContent=s.refs_active;$('refLink').value=s.ref_link;$('minimum').textContent=money(s.min_withdraw);$('videoArea').innerHTML=s.videos.length?s.videos.map(v=>`<div class="row"><span>${escapeHtml(v.title)}</span><span>${v.id===activeVideo?'▶':'•'}</span></div>`).join(''):'Hozircha video mavjud emas.';$('history').innerHTML=s.history.length?s.history.map(h=>`<div class="row"><span>${money(h.amount)}</span><span>${escapeHtml(h.status)}</span></div>`).join(''):'Hozircha so‘rov yo‘q';}
+function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+async function refresh(){try{render(await api('state'))}catch(e){$('videoArea').textContent=e.message;$('start').disabled=true}}
+async function startVideo(){if(!state?.videos?.length)return;const v=state.videos.find(x=>x.id===activeVideo)||state.videos[0];activeVideo=v.id;$('videoArea').innerHTML=`<div><b>${escapeHtml(v.title)}</b></div><video class="video" controls autoplay playsinline src="${escapeHtml(v.url)}"></video><div class="notice">Videoni ko‘rayotganingizda sahifani ochiq qoldiring.</div>`;$('start').disabled=true;clearInterval(videoTimer);videoTimer=setInterval(async()=>{try{render(await api('heartbeat'));}catch(e){$('watchNote').textContent=e.message;clearInterval(videoTimer)}},5000);const el=document.querySelector('video');el?.addEventListener('ended',()=>{clearInterval(videoTimer);$('start').disabled=false;refresh()});}
+async function withdraw(){try{const d=await api('withdraw',{amount:$('withdrawAmount').value,wallet:$('walletAddress').value});render(d);$('withdrawMsg').textContent='So‘rov qabul qilindi. Admin ko‘rib chiqadi.';tg?.HapticFeedback?.notificationOccurred('success')}catch(e){$('withdrawMsg').textContent=e.message}}
+function copyRef(){const v=$('refLink').value;navigator.clipboard?.writeText(v);tg?.showAlert?.('Havola nusxalandi');}
+refresh();
+</script></body></html>
