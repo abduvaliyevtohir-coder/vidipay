@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: vidipay
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    plan: free
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_IDS
+        sync: false
+      - key: WEBAPP_URL
+        sync: false
+      - key: RATE_PER_HOUR
+        value: "0.10"
+      - key: REF_BONUS
+        value: "0.50"
+      - key: MIN_WITHDRAW
+        value: "5"
+      - key: DAILY_CAP_MIN
+        value: "120"
